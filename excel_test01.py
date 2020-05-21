@@ -109,4 +109,3 @@ else:
     sheet = wb.sheets.add(str(sheet_name))
 
 proc_log_init()
-check_
