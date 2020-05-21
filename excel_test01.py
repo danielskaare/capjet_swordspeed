@@ -1,23 +1,28 @@
 import xlwings as xw
 import pandas as pd
-import os
 import configparser
-from datetime import datetime, timedelta
-import time
 import os.path
 from tkinter import messagebox
 
-df = pd.DataFrame([[9, 5], [3, 4]], columns=['c1', 'c2'], index=['r1', 'r2'])
+#  df = pd.DataFrame([[9, 5], [3, 4]], columns=['c1', 'c2'], index=['r1', 'r2'])
 
-# wb = xw.Book()
-# xw.Book('Book1')
 book_path = 'c:\\temp\\xlwings\\XXXXX_Project_Name_Proc_Log.xlsx'
 book_name = os.path.basename(book_path)
 sheet_name = 'CJ_Proc_Log'
 
+def format_sheet():
+    sheet.range('A1:H3').color = (255, 200, 255)  # Purple
+    sheet.range('A1:B3').api.Font.Bold = True
+    sheet.range('A1:B3').api.HorizontalAlignment = 2
+    sheet.range('A1:B3').rows.autofit()
+    adr = sheet.range('A4').expand('right').address
+    sheet.range(str(adr)).api.Font.Bold = True
+    sheet.range(adr).color = (200, 200, 200)  # Grey
+    sheet.range(adr).columns.autofit()
 
 def proc_log_init():
     print("Init Proc Log")
+
     # Read in Config file
     Config = configparser.ConfigParser()
     # Get settings file from selected INI file in GUI
@@ -51,15 +56,9 @@ def proc_log_init():
     sheet.range('B1').value = str(projnr)
     sheet.range('B2').value = str(runlineid)
     sheet.range('B3').value = str(sqlitepath)
-
-    #
-    # Start to fill out tabel
-    #
-    df_exist = sheet.range('A5').options(pd.DataFrame,
-                                 header=1,
-                                 index=True,
-                                 expand='table').value
-    print(df_exist)
+    adr = sheet.range('A1').end('down').address
+    adr = adr[:3] + str(int(adr[3:]) + 1)
+    print("Inser proc log line at: " + str(adr))
     tid_nr = 1
     pass_nr = 2
     kp_low = 3
@@ -78,18 +77,21 @@ def proc_log_init():
                     capjet_button_pussed]
     gui_data_vec_header = ['tid_nr', 'pass_nr', 'kp_low', 'kp_high', 'time_start', 'time_end', 'kp_ref',
                            'capjet_button_pussed']
+    excel_header = gui_data_vec_header
+    excel_add_new_line = gui_data_vec
 
-    #df_1 = pd.DataFrame([[1, 2], [3, 4]], columns= ['TID', 'Date'])
-    df_1 = pd.DataFrame([gui_data_vec + settings_vec], index=None)
-    sheet.range('A4').value = [gui_data_vec_header]
-    sheet.range('A5').value = df_1
-    sheet.range('A5').options(pd.DataFrame, expand='table').value
-    # sheet.range('A4').value = "Index"
-    # if WorksheetFunction.CountA(ActiveSheet.UsedRange) = 0 And ActiveSheet.Shapes.Count = 0 Then
-    #     MsgBox "Sheet is empty", vbInformation, "KuTools For Excel"
-    # Else
-    #     MsgBox "Sheet is not empty", vbInformation, "KuTools For Excel"
-    # End If
+    for i in range(len(settings_vec_header)):
+        excel_header.append(settings_vec_header[i])
+
+    for i in range(len(settings_vec)):
+        excel_add_new_line.append(settings_vec[i])
+    if int(adr[3:]) - 1 < 4:
+        print("PROC LOG header doesnt exist")
+        sheet.range('A4').value = [excel_header]
+        sheet.range('A5').value = excel_add_new_line
+    else:
+        sheet.range(adr).value = excel_add_new_line
+    format_sheet()
 
 
 if os.path.isfile(book_path):
@@ -107,6 +109,4 @@ else:
     sheet = wb.sheets.add(str(sheet_name))
 
 proc_log_init()
-# sheet.range('A1').value = "Test 03"  #  df
-
-# sheet.range('A1').options(pd.DataFrame, expand='table').value
+check_
