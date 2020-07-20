@@ -5,27 +5,26 @@
                                  A Standalone Program
  This is a standalone software to extract Capjet data, used on Naxans Projects for iSurvey usage only
                               -------------------
-        begin                : 2020-05-04
+        begin                : 2020-07-20
         git sha              : $Format:%H$
-        copyright            : (C) 2020 by Daniel Skåre
-        email                : dags@isurvey-group.com
+        copyright            : (C) 2020 by Daniel G. Skåre
+        email                : daniel.skare84@gmail.com
  ***************************************************************************/
 
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- ***************************************************************************/
+/****************************************************************************
+ *                                                                          *
+ *   This program is free software; you can redistribute it and/or modify   *
+ *   it under the terms of the GNU General Public License as published by   *
+ *   the Free Software Foundation; either version 2 of the License, or      *
+ *   (at your option) any later version.                                    *
+ *                                                                          *
+ ****************************************************************************/
 """
 
 # import pandas and datetime
 import pandas as pd
 import xlwings as xw
 from urllib.request import pathname2url
-from tkinter import *
 import matplotlib.pyplot as plt
 # import matplotlib.dates as matpldate
 import numpy as np
@@ -42,6 +41,7 @@ import subprocess as sp
 import sys
 import glob
 import math
+from tkinter import *
 
 # from pykalman import KalmanFilter
 # from matplotlib.ticker import FormatStrFormatter
@@ -716,14 +716,117 @@ pd.options.mode.chained_assignment = None  # default='warn'
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
-def save_to_proc_log():
-    excel_name = proc_log_path_value.get()
+def format_excel_sheet(sheet):
+    sheet.range('A1:H3').color = (255, 200, 255)  # Purple
+    sheet.range('A1:B3').api.Font.Bold = True
+    sheet.range('A1:B3').api.HorizontalAlignment = 2
+    sheet.range('A1:B3').rows.autofit()
+    adr = sheet.range('A4').expand('right').address
+    sheet.range(str(adr)).api.Font.Bold = True
+    sheet.range(adr).color = (200, 200, 200)  # Grey
+    sheet.range(adr).columns.autofit()
+
+
+def proc_log_init(sheet, cjx):
+    print("Init Proc Log")
+    # Read in Config file
+    Config = configparser.ConfigParser()
+    # Get settings file from selected INI file in GUI
+    index = SETUP_NAME.index(setup_file_variable.get())
+    setup_file = SETUP_PATH[index]
+    print(setup_file)
+    #  setup_file = "C:\\Users\\dags\\Desktop\\Capjet Sword Speed Stuff\\24 CAPJET DATA\\24 CAPJET DATA\\Setup Files\\13771 MAME CONF CapjetA.ini"
+    if not Config.read(setup_file):
+        err0 = str(setup_file) + " file not found in current directory"
+        print(err0)
+        messagebox.showwarning("Try Again...", err0)
+        return
+    Config.read(setup_file)
+    projnr = Config["DEFAULT"]['ProjectNr']
+    runlineid = Config["DEFAULT"]['RunlineID']
+    sqlitepath = Config["DEFAULT"]['SQLiteDB']
+    timefilterformat = Config["DEFAULT"]['Time_filter_format_gui']
+    interpol = Config.getboolean("DEFAULT", 'Interpolate_Data')
+    Export_dir = Config["DEFAULT"]['Export_dir']
+    Position_smooth_factor = Config.getint("Position", 'Position_smooth_factor')
+    sword1lowest = Config.getfloat("Sword1", 'Sword1_lowest')
+    sword1highest = Config.getfloat("Sword1", 'Sword1_highest')
+    sword2lowest = Config.getfloat("Sword2", 'Sword2_lowest')
+    sword2highest = Config.getfloat("Sword2", 'Sword2_highest')
+    dcclowest = Config.getfloat('DCC', 'DCC_lowest')
+    dcchighest = Config.getfloat('DCC', 'DCC_highest')
+    speedlowest = Config.getfloat("Speed", 'Speed_lowest')
+    speedhighest = Config.getfloat("Speed", 'Speed_highest')
+    speedsmoothfactor = Config.getint("Speed", 'Speed_smooth_factor')
+    cj_sting_loopup_delta = Config.getint("Capjet RAW String", 'Lookup_time_delta')
+    sheet.range('A1').value = "Project Nr.:"
+    sheet.range('A2').value = "Runline ID:"
+    sheet.range('A3').value = "MasterFile Path"
+    sheet.range('B1').value = str(projnr)
+    sheet.range('B2').value = str(runlineid)
+    sheet.range('B3').value = str(sqlitepath)
+    adr = sheet.range('A1').end('down').address
+    adr = adr[:3] + str(int(adr[3:]) + 1)
+    print("Inser proc log line at: " + str(adr))
+    tid_nr = tid.get("1.0", END)
+    pass_nr = t_pass_nr.get("1.0", END)
+    kp_low = kpstart.get()
+    kp_high = kpend.get()
+    time_start = timestartgui_value.get()
+    time_end = timeendgui_value.get()
+    kp_ref = text_string_kp_ref.get("1.0", END)
+    capjet_button_pussed = str(cjx)
+    settings_vec = [timefilterformat, interpol, Export_dir, Position_smooth_factor, sword1lowest, sword1highest,
+                    sword2lowest, sword2highest, dcclowest, dcchighest, speedlowest, speedhighest, speedsmoothfactor,
+                    cj_sting_loopup_delta]
+    settings_vec_header = ['timefilterformat', 'interpol', 'Export_dir', 'Position_smooth_factor', 'sword1lowest',
+                           'sword1highest', 'sword2lowest', 'sword2highest', 'dcclowest', 'dcchighest', 'speedlowest',
+                           'speedhighest', 'speedsmoothfactor', 'cj_sting_loopup_delta']
+    gui_data_vec = [tid_nr, pass_nr, kp_low, kp_high, time_start, time_end, kp_ref,
+                    capjet_button_pussed]
+    gui_data_vec_header = ['tid_nr', 'pass_nr', 'kp_low', 'kp_high', 'time_start', 'time_end', 'kp_ref',
+                           'capjet_button_pussed']
+    excel_header = gui_data_vec_header
+    excel_add_new_line = gui_data_vec
+
+    for i in range(len(settings_vec_header)):
+        excel_header.append(settings_vec_header[i])
+
+    for i in range(len(settings_vec)):
+        excel_add_new_line.append(settings_vec[i])
+    if int(adr[3:]) - 1 < 4:
+        print("PROC LOG header doesnt exist")
+        sheet.range('A4').value = [excel_header]
+        sheet.range('A5').value = excel_add_new_line
+    else:
+        sheet.range(adr).value = excel_add_new_line
+    format_excel_sheet(sheet)
+
+
+def save_to_proc_log(cjx):
+    book_path = proc_log_path_value.get()
+    book_name = os.path.basename(book_path)
     sheet_name = proc_log_sheet_value.get()
-    wb = xw.Book()
-    sheet = wb.sheets[str(excel_name)]
-    df = pd.DataFrame([[9, 5], [3, 4]], columns=['c1', 'c2'], index=['r1', 'r2'])
-    sheet.range('A1').value = df
-    sheet.range('A1').options(pd.DataFrame, expand='table').value
+    # sheet_name = 'CJ_Proc_Log'
+    #  Check if proc log exists
+    if os.path.isfile(book_path):
+        wb = xw.Book(book_path)
+        # print(xw.apps.keys())
+        all_sheets = xw.Book(book_name).sheets  # active book
+        try:
+            sheet = wb.sheets.add(str(sheet_name))
+        except ValueError as e:
+            sheet = wb.sheets[sheet_name]
+    else:
+        print(str(book_path) + " Does not exist, creating excel document")
+        if not os.path.exists(os.path.dirname(book_path)):
+            print("Creating Directory: " + os.path.dirname(book_path))
+            os.makedirs(os.path.dirname(book_path))
+        wb = xw.Book()
+        wb.save(book_path)
+        sheet = wb.sheets.add(str(sheet_name))
+    #  Start writing to proc log
+    proc_log_init(sheet, cjx)
 
 
 def add1():
@@ -804,7 +907,13 @@ def limitNumberField(*args):
 
 
 def menu_instructions():
-    webbrowser.open("Instructions_v0.91.pdf")
+    path = os.path.dirname(os.path.realpath(__file__))
+    file_nm1 = os.path.join(path,  "Instructions_v0.91.pdf")
+    print(file_nm1)
+    try:
+        webbrowser.open_new(file_nm1)
+    except FileNotFoundError:
+        print("File not found")
     return
 
 
@@ -867,7 +976,7 @@ def current_batch_script_settings():
 #     return
 
 def menu_about():
-    streng = "Capjet Sword Speed was created by iSurvey for easier and faster filtering the Sword and Speed data from the Offshore Trenching operations. \n\nThis Scripts is made especially for the Nexans Nordlink project onboard Polar King. \n\nProgram was last compiled by Daniel Skaare the 23.06.2019 (v1.08)\n\n Thank you for using it!"
+    streng = "Capjet Sword Speed was created by iSurvey for easier and faster filtering the Sword and Speed data from the Offshore Trenching operations. \n\nThis Scripts is made especially for the Nexans Nordlink project onboard Polar King. \n\nProgram was last compiled by Daniel Skaare the 20.07.2020 (v1.21)\n\n Thank you for using it!"
     messagebox.showinfo("About...", streng)
     return
 
@@ -878,7 +987,10 @@ def menu_versions():
              "- Added depth plot with the possibility to turn it off since it is rather slow\n" \
              "- Added this version list\n" \
              "- Added date conversion on the videologger since this year it was not set up as default format. This is very slow (25s for one TID!) Videologger should be set as default\n" \
-             "- Added new variables in settings ini file: [Batch Script]-DestLoc=D:\\temp\InputData, [Default]-Plot_depth_figure = False\n"
+             "- Added new variables in settings ini file: [Batch Script]-DestLoc=D:\\temp\InputData, [Default]-Plot_depth_figure = False\n" \
+             "v1.2:\n- Reads Daily log from masterfile to extract data.\n" \
+             "- Writes settings to an excel processing log file\n" \
+            "v1.21:\n- Fixed DropDown Menu to update when different setup is selected.\n"
     messagebox.showinfo("About...", streng)
     return
 
@@ -922,13 +1034,12 @@ def plot_results(panda_data, CJX, df_etr, df_etr_proc, tid):
     etr_plot['DateTime'] = pd.to_datetime(etr_plot['DateTime'], format='%d-%m-%y %H:%M:%S:%f"', errors='ignore')
     etr_plot['WaterDepth'] = pd.to_numeric(etr_plot['WaterDepth'])
     # etr_plot.set_index(['Time'], inplace=True)
-    print(df_etr_proc['Date'])
+    # print(df_etr_proc['Date'])
     data1 = {'DateTime': df_etr_proc['Date'] + ' ' + df_etr_proc['Time'], 'WaterDepth': df_etr_proc['WaterDepth']}
     etr_proc_plot = pd.DataFrame(data=data1)
     etr_proc_plot['DateTime'] = pd.to_datetime(etr_proc_plot['DateTime'], format='%d-%m-%y %H:%M:%S:%f"',
                                                errors='ignore')
     # etr_proc_plot.set_index(['Time'], inplace=True)
-
     # etr_time['Time'] = pd.to_datetime(df_etr['Date'] + ' ' + df_etr['Time'], format='%d-%m-%y %H:%M:%S:%f"', errors='ignore')
     # etr_proc_time['Time'] = pd.to_datetime(df_etr_proc['Date'] + ' ' + df_etr_proc['Time'], format='%d-%m-%y %H:%M:%S:%f"', errors='ignore')
     # data.set_index(['time'], inplace=True)
@@ -961,7 +1072,6 @@ def plot_results(panda_data, CJX, df_etr, df_etr_proc, tid):
     # thismanager = get_current_fig_manager()
     # thismanager.window.SetPosition((500, 0))
     plt.show(block=False)
-
     # Plot Figure2 and results
     fig2 = plt.figure()
     fig2.subplots_adjust(left=None, bottom=None, right=0.84, top=None,
@@ -1081,7 +1191,7 @@ def plot_results(panda_data, CJX, df_etr, df_etr_proc, tid):
     return
 
 
-def run_script(CJX, tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend, CheckVar1, CheckVar2):
+def run_script(CJX, tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend, CheckVar1, CheckVar2, CheckVar3):
     #   log_file = open(".\\OutputData\\message.log", "a")
     #   sys.stdout = log_file
     try:
@@ -1379,9 +1489,10 @@ def run_script(CJX, tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend
     df_filtered[Date] = df_filtered[Date].replace(['CONV.ERR'], np.nan).ffill()
     #  Filter: Set data time span
     try:
-        df_filtered['Time'] = pd.to_datetime(df_filtered[Date] + ' ' + df_filtered[Time], format=dateformat,
-                                             errors='ignore')
-        #  df_filtered['Time'] = [datetime.strptime(x, dateformat) for x in df_filtered['Time']]
+        # PASL: Using datetime in Log_Datetime column instead of merging the date and time column
+        df_filtered['Time'] = df_filtered['LOG_DATETIME']
+        # df_filtered['Time'] = pd.to_datetime(df_filtered[Date] + ' ' + df_filtered[Time], format=dateformat, errors='ignore')
+        # df_filtered['Time'] = [datetime.strptime(x, dateformat) for x in df_filtered['Time']]
         datetime_start = datetime.strptime(timestart2, timefilterformat)
         datetime_end = datetime.strptime(timeend2, timefilterformat)
     except ValueError as e:
@@ -1460,7 +1571,7 @@ def run_script(CJX, tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend
              'Northing': df_filtered[N], 'WaterDepth': df_filtered[Depth], 'Roll': df_filtered['Roll'],
              'Pitch': df_filtered['Pitch'], 'Heading': df_filtered[HDG], KP: df_filtered[KP]}
         # d = {'DateTime': dateformatet, '#DAY-MONTH-YEAR': dateformatet.dt.strftime('%d-%m-%y'), 'HOUR:MIN:SEC.AAA': dateformatet.dt.strftime('%H:%M:%S.%f').str[:-3], 'EASTING': df_filtered[E], 'NORTHING': df_filtered[N], 'DEPTH': df_filtered[Depth], 'ROLL': df_filtered['Roll'], 'PITCH': df_filtered['Pitch'], 'HEADING': df_filtered[HDG]}
-        print(d)
+        # print(d)
         df_etr = pd.DataFrame(data=d)
         df_etr['Tide'] = 0.00
         df_etr_proc = pd.DataFrame(data=d)
@@ -1839,10 +1950,13 @@ def run_script(CJX, tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend
         #     err2 = "Close the: " + export_csv_cjraw + " file and try again to get the CSV export!"
         #     messagebox.showwarning("Try Again...", str(e))
         #     print(err2)
-
         # datetime_start = datetime.strptime(datetime_start, raw_string_dateformat)
         # datetime_end = datetime.strptime(datetime_end, raw_string_dateformat)
-        df3 = df3[(df3.ix[:, 0] >= datetime_start) & (df3.ix[:, 0] <= datetime_end)]
+        # df3 = df3[(df3.ix[:, 0] >= datetime_start) & (df3.ix[:, 0] <= datetime_end)] ix is depreciated
+
+        # Old Depreciated
+        # df3 = df3[(df3.loc[:, 0] >= datetime_start) & (df3.loc[:, 0] <= datetime_end)]
+        df3 = df3.loc[(df3['time'] >= datetime_start) & (df3['time'] <= datetime_end)]
         df3 = df3.sort_values(by='time')
         export_csv_cjraw = Export_dir + projnr + ' ISAS B02 CapjetString-RAW TID' + str(
             tid) + ' KP' + "{:.3f}".format(df_filtered[KP].min()) + '-' + "{:.3f}".format(
@@ -1980,11 +2094,42 @@ def run_script(CJX, tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend
 
         print("Finished CJ RAWString2DB")
 
-    save_to_proc_log()
+    if CheckVar3.get():
+        save_to_proc_log(CJX)
+    else:
+        print("Skipping Excel Proc Log Sheet")
     print("--== End of Script ==--")
     # sys.stdout = save_stdout
     # log_file.close()
     return
+
+
+def init_excel_conf_ini():
+    # Check if Excel Sections exists and add
+    config = configparser.ConfigParser()
+    setup_file = SETUP_PATH[SETUP_NAME.index(setup_file_variable.get())]
+    if not config.read(setup_file):
+        err0 = str(setup_file) + " file not found in current directory"
+        print(err0)
+        messagebox.showwarning("Try Again...", err0)
+        return
+
+    if not config.has_section("Excel Sheet"):
+        config.add_section('Excel Sheet')
+        if not config.has_option("Excel Sheet", "Excel_Proc_Log_Path"):
+            print("Creating [Excel Sheet]-[Excel_Proc_Log_Path] section in " + str(setup_file))
+            config.set('Excel Sheet', 'Excel_Proc_Log_Path', 'c:\\temp\\XXXXX Project Name Proc Log.xlsx')
+            # write ini
+        if not config.has_option("Excel Sheet", "Excel_Sheet_Name"):
+            print("Creating [Excel Sheet]-[Excel_Sheet_Name] section in " + str(setup_file))
+            config.set('Excel Sheet', 'Excel_Sheet_Name', 'CJ Proc_Log')
+
+        #  write ini
+        with open(setup_file, 'w') as new_ini:
+            config.write(new_ini)
+
+    proc_log_path_value.set(str(config["Excel Sheet"]['Excel_Proc_Log_Path']))
+    proc_log_sheet_value.set(str(config["Excel Sheet"]['Excel_Sheet_Name']))
 
 
 def get_tids():
@@ -2002,7 +2147,7 @@ def get_tids():
     master_file_path = Config["DEFAULT"]['SQLiteDB']
     if os.path.exists(master_file_path):
         # print("File exists")
-        print('Masterfile exists')
+        print('Masterfile selected: ' + str(master_file_path))
         dburi = 'file:{}?mode=rw'.format(pathname2url(master_file_path))
         try:
             conn = sqlite3.connect(dburi, uri=True)
@@ -2027,21 +2172,43 @@ def get_tids():
                         'SELECT DISTINCT round(trenching_id,1) FROM fieldlog WHERE (trenching_id between 0 AND 10000) ORDER BY trenching_id DESC;')
                     tid_tuples = cur.fetchall()
                     # print(tid_tuples)
+                    # Implement populate TID list
+                    tid_list = []
+                    try:
+                        menu = select_tid_dropdown["menu"]
+                        menu.delete(0, "end")
+                        first_run = False
+                    except NameError:
+                        # Runs when first run due to OptionMenu not created yet
+                        first_run = True
+
+                    if tid_tuples:
+                        for tid_element2 in tid_tuples:
+                            tid_list.append(tid_element2[0])
+                            if not first_run:
+                                menu.add_command(label=tid_element2, command=lambda value=tid_element2[0]: tkvar.set(value))
+                        tkvar.set(tid_list[0])  # default value
+                    else:
+                        tid_list.append((int(1), int(1), 1, 350, '2019-01-01 00:00:00', '2020-12-31 23:59:59'))
+                        tkvar.set('No TID in DB')  # default value
 
                 except sqlite3.IntegrityError:
                     print("Operation Types are already in this database")
                     return
                 except sqlite3.DatabaseError:
-                    print("Probable some of the tables or columns has the wrong name:" + str(sys.exc_info()[0]))
+                    print("1: Probable some of the tables or columns has the wrong name:" + str(sys.exc_info()[0]))
                     return
                 except:
-                    print("Unexpected error Trying to SELECT DISTINCT sid_id and tid_id:" + str(sys.exc_info()[0]))
+                    print("3: Unexpected error Trying to SELECT DISTINCT sid_id and tid_id:" + str(sys.exc_info()[0]))
                     return
+            conn.close()
     else:
         err0 = str(master_file_path) + " file not found in current directory"
         print(err0)
         messagebox.showwarning("Try Again...", err0)
         return
+
+    #  init_excel_conf_ini()
 
 
 def extract_tid():
@@ -2109,10 +2276,13 @@ def populate_gui_from_tuple(script_input_tuples):
                     print("Operation Types are already in this database")
                     return script_input_tuples[0]
                 except sqlite3.DatabaseError:
-                    print("Probable some of the tables or columns has the wrong name:" + str(sys.exc_info()[0]))
+                    print("2: Probable some of the tables or columns has the wrong name:" + str(sys.exc_info()[0]))
+                    return script_input_tuples[0]
+                except sqlite3.ValueError:
+                    print("3: Probably TID is not closed in DailyLog (TID not finished):" + str(sys.exc_info()[0]))
                     return script_input_tuples[0]
                 except:
-                    print("Unexpected error Trying to SELECT DISTINCT sid_id and tid_id:" + str(sys.exc_info()[0]))
+                    print("4: Unexpected error Trying to SELECT DISTINCT sid_id and tid_id:" + str(sys.exc_info()[0]))
                     return script_input_tuples[0]
     #  print(script_input_tuples[0][0])
     #  print(script_input_tuples[0][1])
@@ -2153,7 +2323,6 @@ def get_tid_data(tid_nr):
             with conn:
                 try:
                     cur = conn.cursor()
-                    # sql_query = "SELECT trenching_id, trenching_pass_id, min(kp), max(kp), min(time), max(time) FROM trenching WHERE trenching_id=" + str(tid_nr) + ";"
                     sql_query = "with temp as (" \
                                 "SELECT round(trenching_id,1) as trenching_id, running_pass, kp, time_fix, task_trenching, kp_ref, " \
                                 "case when time_fix = min(time_fix) over(partition by round(trenching_id,1)) then true else false end as is_min_time_fix, " \
@@ -2175,6 +2344,7 @@ def get_tid_data(tid_nr):
                                                                         "and tmax.is_max_time_fix " \
                                                                         "where tmin.is_min_time_fix " \
                                                                         "order by tmin.trenching_id" + ";"
+                    # sql_query = "SELECT trenching_id, trenching_pass_id, min(kp), max(kp), min(time), max(time) FROM trenching WHERE trenching_id=" + str(tid_nr) + ";"
                     cur.execute(sql_query)
                     script_input_tuples = cur.fetchall()
                     populate_gui_from_tuple(script_input_tuples)
@@ -2183,11 +2353,18 @@ def get_tid_data(tid_nr):
                     print("Operation Types are already in this database")
                     return
                 except sqlite3.DatabaseError:
-                    print("Probable some of the tables or columns has the wrong name:" + str(sys.exc_info()[0]))
+                    print("3: Probable some of the tables or columns has the wrong name:" + str(sys.exc_info()[0]))
+                    return
+                except IndexError:
+                    print("4: Probably forgot to press 'Get TIDs' Button:" + str(sys.exc_info()[0]))
+                    return
+                except ValueError:
+                    print("5: Probably the TID is not finished or Daily Log has not closed TID " + str(sys.exc_info()[0]))
                     return
                 except:
-                    print("Unexpected error Trying to SELECT DISTINCT sid_id and tid_id:" + str(sys.exc_info()[0]))
+                    print("6: Unexpected error Trying to SELECT DISTINCT sid_id and tid_id:" + str(sys.exc_info()[0]))
                     return
+            conn.close()
     else:
         err0 = str(master_file_path) + " file not found in current directory"
         print(err0)
@@ -2196,7 +2373,7 @@ def get_tid_data(tid_nr):
         populate_gui_from_tuple(script_input_tuples)
         return
     # print(script_input_tuples[0])
-
+    #script_input_tuples = [(1, 1, 1, 350, '2019-01-01 00:00:00', '2025-12-31 23:59:59')]
     return script_input_tuples[0]
 
 
@@ -2204,7 +2381,7 @@ def get_tid_data(tid_nr):
 
 
 root = Tk()
-root.title("Capjet Sword and Speed Script")
+root.title("CAPJET DATA EXTRACTOR v1.21")
 # kpstart_value = StringVar(value=0.000)
 # kpstart_value.trace('w', limitKpStartField)
 # kpend_value = StringVar(value=500.000)
@@ -2224,6 +2401,7 @@ timestartgui_value = StringVar(value='2020-05-01 00:00:00')
 timestartgui_value.trace('w', limitTimeStartField)
 timeendgui_value = StringVar(value='2020-06-16 23:59:59')
 timeendgui_value.trace('w', limitTimeEndField)
+
 
 frame = Frame()
 frame.pack()
@@ -2267,10 +2445,10 @@ frame2.pack()
 
 button_run_1 = Button(frame2, text="Run Capjet A",
                       command=lambda: run_script('CJA', tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend,
-                                                 CheckVar1, CheckVar2), height=5, width=20)
+                                                 CheckVar1, CheckVar2, CheckVar3), height=5, width=20)
 button_run_2 = Button(frame2, text="Run Capjet B",
                       command=lambda: run_script('CJB', tid, t_pass_nr, time_start_gui, time_end_gui, kpstart, kpend,
-                                                 CheckVar1, CheckVar2), height=5, width=20)
+                                                 CheckVar1, CheckVar2, CheckVar3), height=5, width=20)
 button_run_close = Button(frame2, text="Close All Plots", command=lambda: plt.close('all'), height=2, width=15)
 label1 = Label(frame,
                text="Small script to filter the Capjet sword and speed. \nWritten so all VisualSoft or Option files and the entire project can be calculated in one go.\n\nThe Start and End time format can be defined in the Filter Settings INI file.\nDefault is  [Default: yyyy-mm-dd hh:mm:ss].")
@@ -2331,16 +2509,19 @@ time_end_gui = Entry(frame_end_time, width=21, textvariable=timeendgui_value)
 text_string_kp_ref = Text(frame_kp_ref, height=1, width=21)
 label_kp_ref.pack(side=LEFT, padx=5)
 text_string_kp_ref.pack(side=LEFT, padx=5)
-proc_log_path = os.path.abspath('c:\\temp\\XXXXX Project Name Proc Log.xlsm')
-proc_log_sheet = 'CJ Proc_Log'
+# proc_log_path = os.path.abspath('c:\\temp\\XXXXX Project Name Proc Log.xlsx')
+# proc_log_sheet = 'CJ Proc_Log'
+
+
 proc_log_path_value = StringVar(value=1)
 proc_log_sheet_value = StringVar(value=1)
-proc_log_path_value.set(str(proc_log_path))
-proc_log_sheet_value.set(proc_log_sheet)
+# proc_log_path_value.set(str(proc_log_path))
+# proc_log_sheet_value.set(proc_log_sheet)
 proc_log_entry_doc = Entry(frame_proc_log, width=50, textvariable=proc_log_path_value)
-proc_log_entry_sheet = Entry(frame_proc_log_sheet, width=30, textvariable=proc_log_sheet_value)
-proc_log_path_value.set(str(proc_log_path))
-proc_log_sheet_value.set(proc_log_sheet)
+proc_log_entry_sheet = Entry(frame_proc_log_sheet, textvariable=proc_log_sheet_value, width=30)
+# proc_log_path_value.set(str(proc_log_path))
+# proc_log_sheet_value.set(proc_log_sheet)
+init_excel_conf_ini()
 
 label_proc_log.pack(side=LEFT, padx=5)
 proc_log_entry_doc.pack(side=LEFT, padx=5)
@@ -2351,8 +2532,12 @@ CheckVar1 = IntVar()
 CheckVar1.set(1)
 CheckVar2 = IntVar()
 CheckVar2.set(1)
+CheckVar3 = IntVar()
+CheckVar3.set(1)
 C1 = Checkbutton(frame2, text="Run Batch Script?", variable=CheckVar1, onvalue=True, offvalue=False, height=1, width=20)
 C2 = Checkbutton(frame2, text="Run Capjet RAW String2DB?", variable=CheckVar2, onvalue=True, offvalue=False, height=1,
+                 width=20)
+C3 = Checkbutton(frame2, text="Run Excel Proc Log?", variable=CheckVar3, onvalue=True, offvalue=False, height=1,
                  width=20)
 # label_CJ_raw = Label(frame2, text=label_CJRAW_string)
 
@@ -2366,9 +2551,10 @@ get_tids_button = Button(frame_tid_select, text="Get TIDs", command=lambda: get_
 get_tids_button.pack(side=LEFT, padx=5)
 
 # ---------- START OF TID NO DROP DOWN MENU
-get_tids()
 tid_list = []
 tkvar = StringVar(root)
+get_tids()
+
 if tid_tuples:
     for tid_element in tid_tuples:
         # self.dlg.comboBox_TID.addItem(str(tid_element[0]))
@@ -2379,13 +2565,17 @@ else:
     tid_list.append((int(1), int(1), 1, 350, '2019-01-01 00:00:00', '2020-12-31 23:59:59'))
     tkvar.set('No TID in DB')  # default value
 
+
+
 select_tid_dropdown = OptionMenu(frame_tid_select, tkvar, *tid_list)
 select_tid_dropdown.pack(side=LEFT, padx=5)
 extract_tid_button = Button(frame_tid_select, text="Extract TID Data", command=lambda: extract_tid(), height=1,
                             width=20)
 extract_tid_button.pack(side=LEFT, padx=5)
-
-get_tid_data(tid_list[0])  # Set dataset to selected TID
+try:
+    get_tid_data(tid_list[0])  # Set dataset to selected TID
+except IndexError as e:
+    print("Error getting TIDs: " + str(e))
 
 #  setup_selector.pack()
 # ---------- END OF TID NO DROP DOWN MENU
@@ -2443,6 +2633,7 @@ time_end_gui.pack(side=LEFT, padx=5)
 # inputPath.insert(END, "C:\\Users\\dags\\Documents\\iSURVEY\\Python_Scripts\\Capjet_Sword_Speed_v0.99\\InputData")
 C1.pack()
 C2.pack()
+C3.pack()
 # label_CJ_raw.pack()
 # label3.pack()
 # inputPath.pack()
