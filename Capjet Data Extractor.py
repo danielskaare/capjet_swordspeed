@@ -3,7 +3,7 @@
 /***************************************************************************
  Capjet Data Extractor v.1.10
                                  A Standalone Program
- This is a standalone software to extract Capjet data, used on Naxans Projects for iSurvey usage only
+ This is a standalone software to extract Capjet data, used on Nexans Projects for iSurvey usage only
                               -------------------
         begin                : 2020-07-20
         git sha              : $Format:%H$
@@ -987,9 +987,9 @@ def menu_versions():
              "- Added depth plot with the possibility to turn it off since it is rather slow\n" \
              "- Added this version list\n" \
              "- Added date conversion on the videologger since this year it was not set up as default format. This is very slow (25s for one TID!) Videologger should be set as default\n" \
-             "- Added new variables in settings ini file: [Batch Script]-DestLoc=D:\\temp\InputData, [Default]-Plot_depth_figure = False\n" \
-             "v1.2:\n- Reads Daily log from masterfile to extract data.\n" \
-             "- Writes settings to an excel processing log file\n" \
+             "- Added new variables in settings ini file: [Batch Script]-DestLoc=D:\\temp\InputData, [Default]-Plot_depth_figure = False\n\n" \
+             "v1.2:\n- Reads Daily log from masterfile to extract data.\n\n" \
+             "- Writes settings to an excel processing log file\n\n" \
             "v1.21:\n- Fixed DropDown Menu to update when different setup is selected.\n"
     messagebox.showinfo("About...", streng)
     return
@@ -2454,10 +2454,17 @@ label1 = Label(frame,
                text="Small script to filter the Capjet sword and speed. \nWritten so all VisualSoft or Option files and the entire project can be calculated in one go.\n\nThe Start and End time format can be defined in the Filter Settings INI file.\nDefault is  [Default: yyyy-mm-dd hh:mm:ss].")
 
 # ---------- START OF DROP DOWN MENU
+
+if not os.path.isfile("Config_Main_Setup.ini"):
+    messagebox.showwarning("Error!",
+                           "File 'Config_Main_Setup.ini' not found in same folder!!! \n\nMake sure to copy valid file into current folder! \n\n\n Aborting Program")
+    exit()
+
 try:
     Config_Main_Setup = configparser.ConfigParser()
     Config_Main_Setup.read("Config_Main_Setup.ini")
 except (NameError, KeyError) as e:
+    print("Cant file SETUP FILE!")
     messagebox.showwarning("Error...",
                            "Can not locate Config_Main_Setup.ini in main program folder. Please check if file exists\n\n" + str(
                                e))

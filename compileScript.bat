@@ -1,1 +1,0 @@
-pyinstaller --upx-dir=upx394w Capjet_Sword_Speed_v1.07_OneDir_32bit_upx.spec
