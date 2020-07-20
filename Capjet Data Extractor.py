@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
- Capjet Data Extractor v.1.10
+ Capjet Data Extractor v.1.21
                                  A Standalone Program
  This is a standalone software to extract Capjet data, used on Nexans Projects for iSurvey usage only
                               -------------------
